@@ -1,7 +1,7 @@
 # Vendored skills (V1)
 
 The skills in `.claude/skills/` are copied unchanged from their source repos. All three repos are MIT licensed; the licenses are in `licenses/`.
-V1 uses them as is. V2 customizes them; every change is listed in `../skills-CHANGELOG.md`, and `git diff skills-v1 skills-v2 -- .claude/skills` shows it.
+V1 uses them as is. V2 customizes them; `git diff skills-v1 skills-v2 -- .claude/skills` shows every change.
 
 ## Sources
 

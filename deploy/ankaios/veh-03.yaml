@@ -1,0 +1,114 @@
+apiVersion: v0.1
+workloads:
+  databroker:
+    runtime: podman
+    agent: veh-03
+    restartPolicy: ALWAYS
+    runtimeConfig: 'commandArgs:
+
+      - --insecure
+
+      - --port
+
+      - ''55563''
+
+      - --vss
+
+      - /vss_release_5.1.json,/overlay/overlay.json
+
+      commandOptions:
+
+      - --net=host
+
+      - -v=/opt/fleet/vss:/overlay:ro
+
+      image: ghcr.io/eclipse-kuksa/kuksa-databroker:0.6.0
+
+      '
+  simulator:
+    runtime: podman
+    agent: veh-03
+    restartPolicy: ALWAYS
+    dependencies:
+      databroker: ADD_COND_RUNNING
+    runtimeConfig: 'commandArgs:
+
+      - simulator
+
+      - --vehicle
+
+      - veh-03
+
+      - --kuksa-port
+
+      - ''55563''
+
+      - --zenoh
+
+      - tcp/127.0.0.1:7447
+
+      commandOptions:
+
+      - --net=host
+
+      image: fleet-vehicle:0.1.0
+
+      '
+  detector:
+    runtime: podman
+    agent: veh-03
+    restartPolicy: ALWAYS
+    dependencies:
+      databroker: ADD_COND_RUNNING
+    runtimeConfig: 'commandArgs:
+
+      - detector
+
+      - --vehicle
+
+      - veh-03
+
+      - --kuksa-port
+
+      - ''55563''
+
+      - --zenoh
+
+      - tcp/127.0.0.1:7447
+
+      commandOptions:
+
+      - --net=host
+
+      image: fleet-vehicle:0.1.0
+
+      '
+  publisher:
+    runtime: podman
+    agent: veh-03
+    restartPolicy: ALWAYS
+    dependencies:
+      databroker: ADD_COND_RUNNING
+    runtimeConfig: 'commandArgs:
+
+      - publisher
+
+      - --vehicle
+
+      - veh-03
+
+      - --kuksa-port
+
+      - ''55563''
+
+      - --zenoh
+
+      - tcp/127.0.0.1:7447
+
+      commandOptions:
+
+      - --net=host
+
+      image: fleet-vehicle:0.1.0
+
+      '

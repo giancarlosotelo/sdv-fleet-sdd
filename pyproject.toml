@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fleet"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pyyaml==6.0.3",
+    "jsonschema==4.26.0",
+    "httpx==0.28.1",
+    "fastapi==0.162.5",
+    "uvicorn[standard]==0.54.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1.post1",
+    "ruff==0.17.4",
+    "playwright==1.65.1",
+]
+real = [
+    "kuksa-client==0.6.0",
+    "eclipse-zenoh==1.10.2",
+    "google-cloud-pubsub==2.43.0",
+]
+pipeline = ["apache-beam[gcp]==2.77.0"]
+
+[project.scripts]
+fleet-demo = "fleet.demo.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["fleet*", "contracts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
+addopts = "-p pytester"
+markers = [
+    "standin: runs against in-memory stand-ins for Kuksa, Zenoh or Pub/Sub",
+    "real: runs against real services from deploy/compose.yaml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["RUF059"]

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "fleet/hazard/1",
+  "title": "Current-hazard change, published on fleet/<vehicle_id>/hazard; hazard_type none means cleared",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "schema_version", "msg_id", "vehicle_id", "sim_ts", "wall_ts",
+               "hazard_type", "severity", "t0", "lat", "lon"],
+  "properties": {
+    "kind": {"const": "hazard"},
+    "schema_version": {"const": 1},
+    "msg_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "vehicle_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "sim_ts": {"type": "number", "minimum": 0},
+    "wall_ts": {"type": "integer", "minimum": 0, "description": "UTC epoch milliseconds"},
+    "hazard_type": {"enum": ["harsh_braking", "traction_loss", "overheat", "low_energy", "overspeed", "none"]},
+    "severity": {"type": "integer", "minimum": 0, "maximum": 3, "description": "0 none, 1 warning, 2 high, 3 critical"},
+    "t0": {"type": "integer", "minimum": 0, "description": "detection time, UTC epoch milliseconds"},
+    "lat": {"type": "number", "minimum": -90, "maximum": 90},
+    "lon": {"type": "number", "minimum": -180, "maximum": 180}
+  },
+  "if": {"properties": {"hazard_type": {"const": "none"}}},
+  "then": {"properties": {"severity": {"const": 0}}},
+  "else": {"properties": {"severity": {"minimum": 1}}}
+}

@@ -1,0 +1,1 @@
+{"kind": "telemetry", "schema_version": 1, "msg_id": "6f1c2a3e-0b4d-4e5f-8a9b-1c2d3e4f5a61", "vehicle_id": "veh-02", "sim_ts": 120.0, "wall_ts": 1794000000000, "lat": 43.89756, "lon": -78.86364, "speed_kmh": 0.0, "accel_ms2": 0.0, "traction_active": false, "soc_pct": 60.0, "coolant_c": 65.0, "odometer_km": 0.81, "trip": 1}

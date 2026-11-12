@@ -1,0 +1,57 @@
+{
+  "Vehicle": {
+    "type": "branch",
+    "description": "Vehicle",
+    "children": {
+      "Fleet": {
+        "type": "branch",
+        "description": "Fleet operation and hazard detection signals.",
+        "children": {
+          "TripNumber": {
+            "datatype": "uint32",
+            "type": "sensor",
+            "description": "Current trip; a trip is one full loop of the van's route."
+          },
+          "SimTime": {
+            "datatype": "double",
+            "type": "sensor",
+            "unit": "s",
+            "description": "Simulation time since start."
+          },
+          "Hazard": {
+            "type": "branch",
+            "description": "Most severe current hazard, written by the hazard detector.",
+            "children": {
+              "Type": {
+                "datatype": "string",
+                "type": "sensor",
+                "allowed": [
+                  "none",
+                  "harsh_braking",
+                  "traction_loss",
+                  "overheat",
+                  "low_energy",
+                  "overspeed"
+                ],
+                "description": "Hazard type, or none."
+              },
+              "Severity": {
+                "datatype": "uint8",
+                "type": "sensor",
+                "min": 0,
+                "max": 3,
+                "description": "0 none, 1 warning, 2 high, 3 critical."
+              },
+              "T0": {
+                "datatype": "uint64",
+                "type": "sensor",
+                "unit": "ms",
+                "description": "UTC epoch milliseconds when the current hazard was detected."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

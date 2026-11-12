@@ -1,0 +1,25 @@
+# Real services for `pytest -m real` and the demo's --real-* flags (spec REQ-141).
+# One databroker per van, as under Ankaios; van i (config order) uses host port 55561 + i.
+x-databroker: &databroker
+  image: ghcr.io/eclipse-kuksa/kuksa-databroker:0.6.0
+  command: ["--insecure", "--vss", "/vss_release_5.1.json,/overlay/overlay.json"]
+  volumes: ["../vss:/overlay:ro"]
+
+services:
+  databroker-1:
+    <<: *databroker
+    ports: ["55561:55555"]
+  databroker-2:
+    <<: *databroker
+    ports: ["55562:55555"]
+  databroker-3:
+    <<: *databroker
+    ports: ["55563:55555"]
+  zenoh:
+    image: eclipse/zenoh:1.10.2
+    ports: ["7447:7447"]
+  pubsub:
+    # google-cloud-cli:emulators as of 2026-11-11 (Cloud SDK 593.0.0)
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli@sha256:3989a42372d3b984bade6db02213d456d94a0ba3765e8b744b95c4188b6fcc89
+    command: ["gcloud", "beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", "--project=fleet-local"]
+    ports: ["8085:8085"]

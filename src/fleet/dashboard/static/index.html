@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDV Fleet Monitor</title>
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/leaflet.js"></script>
+</head>
+<body>
+  <header>
+    <h1>SDV Fleet Monitor <span>Oshawa</span></h1>
+    <span id="conn" class="conn">connecting…</span>
+  </header>
+  <main>
+    <section id="map" aria-label="Fleet map"></section>
+    <aside>
+      <section class="panel">
+        <h2>Fleet</h2>
+        <table id="fleet">
+          <thead><tr><th>Van</th><th>Route</th><th>Speed</th><th>Battery</th><th>Trip</th><th>Odometer</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section class="panel">
+        <h2>Latency <small>t1 − t0, target p95 &lt; 2 s</small></h2>
+        <div id="latency" class="latency"></div>
+      </section>
+      <section class="panel alerts">
+        <h2>Alerts
+          <label class="toggle"><input type="checkbox" id="show-resolved"> show resolved</label>
+        </h2>
+        <ol id="alerts"></ol>
+      </section>
+    </aside>
+  </main>
+  <section class="panel routes">
+    <h2>Route performance <small>completed trips only</small></h2>
+    <table id="route-table">
+      <thead><tr><th>Route</th><th>Van</th><th>Trips</th><th>km</th><th>kWh</th><th>kWh/100 km</th><th>Hazards</th><th>Hazards/100 km</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+  <script src="/static/app.js"></script>
+</body>
+</html>

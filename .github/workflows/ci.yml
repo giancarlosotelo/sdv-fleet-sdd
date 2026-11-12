@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  standin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-standin-${{ hashFiles('pyproject.toml') }}
+      - name: Main venv
+        run: python -m venv .venv && .venv/bin/pip install -e ".[dev,real]"
+      - name: Pipeline venv (Beam needs protobuf < 7, kuksa-client needs >= 7)
+        run: python -m venv .venv-pipeline && .venv-pipeline/bin/pip install -e ".[dev,pipeline]"
+      - name: Browser for the dashboard smoke test
+        run: .venv/bin/playwright install --with-deps chromium
+      - name: Lint
+        run: .venv/bin/ruff check . && .venv/bin/ruff format --check .
+      - name: Unit + stand-in tests
+        run: .venv/bin/pytest -m "not real" --ignore=tests/pipeline
+      - name: Pipeline tests
+        run: .venv-pipeline/bin/pytest tests/pipeline -m "not real"
+
+  real:
+    runs-on: ubuntu-latest
+    env:
+      FLEET_REQUIRE_REAL: "1"  # real-service tests fail instead of skipping
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-real-${{ hashFiles('pyproject.toml') }}
+      - name: Start Kuksa, Zenoh, Pub/Sub emulator
+        run: docker compose -f deploy/compose.yaml up -d
+      - name: Main venv
+        run: python -m venv .venv && .venv/bin/pip install -e ".[dev,real]"
+      - name: Pipeline venv
+        run: python -m venv .venv-pipeline && .venv-pipeline/bin/pip install -e ".[dev,pipeline]"
+      - name: Wait for services
+        run: .venv/bin/python scripts/wait_for_services.py
+      - name: Real-service tests
+        run: .venv/bin/pytest -m real --ignore=tests/pipeline
+      - name: Pipeline from the Pub/Sub emulator
+        run: .venv-pipeline/bin/pytest tests/pipeline -m real
+      - name: Service logs
+        if: always()
+        run: docker compose -f deploy/compose.yaml logs

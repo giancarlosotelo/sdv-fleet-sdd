@@ -13,8 +13,6 @@ Every feature goes through these steps, in order, using the skills in `.claude/s
 4. `verification-before-completion`: run the tests and show the output before saying anything is done.
 5. `code-review-and-quality`: review the change against the spec before it is merged.
 
-Record architecture decisions in `docs/adr/`. CI runs every test on every PR.
-
 No code without a spec. If the spec is wrong, fix the spec first, then the code.
 
 ## Where things go
@@ -22,12 +20,9 @@ No code without a spec. If the spec is wrong, fix the spec first, then the code.
 | What | Where |
 |---|---|
 | Specs and plans | `specs/` |
-| Architecture decisions | `docs/adr/NNNN-title.md` |
-| Requirement → code → test mapping | `docs/traceability.md` |
 | Skill evaluation prompts and results | `evals/` |
 | Development measurements (time, tokens, defects, rework) | `measurements/dev-log.csv` |
 | Where each skill came from and why | `skills-vendor/VENDOR.md` |
-| Changes to skills | `skills-CHANGELOG.md` |
 
 ## Stack
 

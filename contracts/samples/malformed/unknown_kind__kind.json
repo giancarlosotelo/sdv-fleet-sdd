@@ -1,0 +1,1 @@
+{"kind": "diagnostics", "schema_version": 1, "msg_id": "6f1c2a3e-0b4d-4e5f-8a9b-1c2d3e4f5a71", "vehicle_id": "veh-01", "sim_ts": 120.0, "wall_ts": 1794000000000, "lat": 43.9, "lon": -78.8, "speed_kmh": 50, "accel_ms2": 0, "traction_active": false, "soc_pct": 50, "coolant_c": 70, "odometer_km": 1, "trip": 1}

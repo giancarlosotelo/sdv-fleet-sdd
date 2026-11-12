@@ -1,0 +1,101 @@
+# Default fleet plus one extra van entry (REQ-001 AC2).
+vehicles:
+- id: veh-01
+  name: Van 01
+  route: A
+  pack_kwh: 68
+  start_soc_pct: 60
+- id: veh-02
+  name: Van 02
+  route: B
+  pack_kwh: 68
+  start_soc_pct: 60
+- id: veh-03
+  name: Van 03
+  route: C
+  pack_kwh: 68
+  start_soc_pct: 60
+- id: veh-04
+  name: Van 04
+  route: B
+  pack_kwh: 68
+  start_soc_pct: 70
+routes:
+  A:
+    name: North (Taunton Rd)
+    speed_limit_kmh: 60
+    anchors:
+    - - 43.92637
+      - -78.90829
+    - - 43.93506
+      - -78.86919
+    - - 43.93965
+      - -78.84941
+    - - 43.93506
+      - -78.86919
+    profile:
+      stops_per_km: 0.4
+      harsh_brake_share: 0.05
+      traction_events_per_km: 0.01
+      speeding_tendency: 0.3
+  B:
+    name: Downtown (King St)
+    speed_limit_kmh: 50
+    anchors:
+    - - 43.89632
+      - -78.87396
+    - - 43.90074
+      - -78.85422
+    - - 43.89986
+      - -78.8538
+    - - 43.89533
+      - -78.87354
+    profile:
+      stops_per_km: 3.0
+      harsh_brake_share: 0.25
+      traction_events_per_km: 0.02
+      speeding_tendency: 0.1
+  C:
+    name: East (Harmony Rd)
+    speed_limit_kmh: 70
+    anchors:
+    - - 43.90439
+      - -78.83408
+    - - 43.93965
+      - -78.84941
+    - - 43.95682
+      - -78.85707
+    - - 43.93965
+      - -78.84941
+    profile:
+      stops_per_km: 0.3
+      harsh_brake_share: 0.04
+      traction_events_per_km: 0.01
+      speeding_tendency: 0.4
+thresholds:
+  brake_high_ms2: 4.0
+  brake_critical_ms2: 7.0
+  traction_min_speed_kmh: 20.0
+  coolant_high_c: 90.0
+  soc_warning_pct: 20.0
+  soc_high_pct: 10.0
+  overspeed_margin_kmh: 10.0
+  tie_break:
+  - traction_loss
+  - harsh_braking
+  - overheat
+  - low_energy
+  - overspeed
+charging:
+  start_at_pct: 10.0
+  stop_at_pct: 90.0
+  rate_kw: 50.0
+publisher:
+  telemetry_hz: 1.0
+  buffer_size: 60
+cloud:
+  offline_timeout_s: 10.0
+demo:
+  port: 8000
+  time_scale: 10.0
+  seed: 42

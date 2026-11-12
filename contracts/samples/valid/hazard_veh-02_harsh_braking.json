@@ -1,0 +1,1 @@
+{"kind": "hazard", "schema_version": 1, "msg_id": "6f1c2a3e-0b4d-4e5f-8a9b-1c2d3e4f5a62", "vehicle_id": "veh-02", "sim_ts": 121.0, "wall_ts": 1794000000150, "hazard_type": "harsh_braking", "severity": 3, "t0": 1794000000100, "lat": 43.89756, "lon": -78.86364}
