@@ -12,20 +12,30 @@ class AlertBook:
         self._new_id = new_id
         self._hazard: dict[str, Alert] = {}
         self._offline: dict[str, Alert] = {}
+        self._last: dict[str, tuple[int, str, int]] = {}  # vehicle -> (t0, type, severity)
         for alert in open_alerts:
             book = self._hazard if alert.kind == "hazard" else self._offline
             book[alert.vehicle_id] = alert
+            if alert.kind == "hazard":
+                self._last[alert.vehicle_id] = (alert.t0_ms, alert.hazard_type, alert.severity)
 
     def open_hazards(self) -> list[Alert]:
         return list(self._hazard.values())
 
+    def offline_vehicles(self) -> list[str]:
+        return list(self._offline)
+
     def hazard(self, msg: dict[str, Any], t1_ms: int, trip: int | None) -> list[Alert]:
         """Returns the alerts that changed: the resolved previous one and/or the newly opened one."""
         vid = msg["vehicle_id"]
-        current = self._hazard.get(vid)
-        incoming = (msg["hazard_type"], msg["severity"])
-        if current and (current.hazard_type, current.severity) == incoming:
+        # The detector stamps every change with its t0: older is stale, identical is a resend.
+        # Two changes can share a millisecond, so an equal t0 with a different hazard is new.
+        incoming = (msg["t0"], msg["hazard_type"], msg["severity"])
+        last = self._last.get(vid)
+        if last and (incoming[0] < last[0] or incoming == last):
             return []
+        self._last[vid] = incoming
+        current = self._hazard.get(vid)
         changed = []
         if current:
             changed.append(replace(current, resolved_ms=t1_ms))

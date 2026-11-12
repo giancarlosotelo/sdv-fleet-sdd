@@ -127,3 +127,43 @@ async def test_req074_outbox_backs_off_exponentially():
 
     gaps = [b - a for a, b in itertools.pairwise(attempts)]
     assert gaps[:5] == [0, 500, 1000, 2000, 4000]
+
+
+class AsyncNotifyTwin(InMemoryTwin):
+    """Delivers updates later and in order, like the Kuksa Databroker's subscription stream."""
+
+    async def subscribe(self, paths, on_change):
+        queue = asyncio.Queue()
+
+        async def drain():
+            while True:
+                await on_change(await queue.get())
+
+        asyncio.get_running_loop().create_task(drain())
+
+        async def enqueue(values):
+            queue.put_nowait(values)
+
+        await super().subscribe(paths, enqueue)
+
+
+async def test_req072_one_tick_hazard_is_published_even_if_already_cleared():
+    """A hazard that lasts one sim tick (10 ms at 10x) must still reach the cloud (REQ-121)."""
+    twin, zenoh, clock = AsyncNotifyTwin(signals.ALL), StandInZenoh(), FakeClock()
+    await twin.set(STATE)
+    got = []
+
+    async def capture(key, payload):
+        got.append(json.loads(payload)["hazard_type"])
+
+    await zenoh.subscribe("fleet/*/hazard", capture)
+    await Publisher("veh-02", twin, zenoh, clock, telemetry_hz=1.0, buffer_size=60).start()
+
+    await twin.set(
+        {signals.HAZARD_TYPE: "harsh_braking", signals.HAZARD_SEVERITY: 3, signals.HAZARD_T0: 1}
+    )
+    await twin.set({signals.HAZARD_TYPE: "none", signals.HAZARD_SEVERITY: 0, signals.HAZARD_T0: 11})
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+    assert got == ["harsh_braking", "none"]

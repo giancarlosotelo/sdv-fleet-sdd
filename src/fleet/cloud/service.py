@@ -33,7 +33,12 @@ class CloudService:
         self._vans = {v.id: v for v in cfg.vehicles}
         self._ingest = Ingest(self._vans)
         self._book = AlertBook(new_id, storage.alerts())
-        self._offline = OfflineMonitor(self._vans, cfg.cloud.offline_timeout_s, clock.now_ms())
+        self._offline = OfflineMonitor(
+            self._vans,
+            cfg.cloud.offline_timeout_s,
+            clock.now_ms(),
+            offline=self._book.offline_vehicles(),  # restored open offline alerts (REQ-086)
+        )
         self._trips = TripTracker(
             {v.id: v.pack_kwh for v in cfg.vehicles}, {v.id: v.route.id for v in cfg.vehicles}
         )

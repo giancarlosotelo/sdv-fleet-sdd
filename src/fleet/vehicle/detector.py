@@ -1,10 +1,13 @@
+import logging
 from typing import Any
 
 from fleet.clock import Clock
 from fleet.config import Thresholds
 from fleet.vehicle import signals
 from fleet.vehicle.rules import Signals, evaluate, most_severe
-from fleet.vehicle.twin import Twin
+from fleet.vehicle.twin import Twin, TwinUnavailable
+
+log = logging.getLogger(__name__)
 
 
 class Detector:
@@ -36,11 +39,15 @@ class Detector:
             await self._write(current)
 
     async def _write(self, current: tuple[str, int]) -> None:
+        try:
+            await self._twin.set(
+                {
+                    signals.HAZARD_TYPE: current[0],
+                    signals.HAZARD_SEVERITY: current[1],
+                    signals.HAZARD_T0: self._clock.now_ms(),
+                }
+            )
+        except TwinUnavailable as ex:  # not recorded, so the next update writes it again (REQ-074)
+            log.warning("can't write hazard %s: %s", current, ex)
+            return
         self._current = current
-        await self._twin.set(
-            {
-                signals.HAZARD_TYPE: current[0],
-                signals.HAZARD_SEVERITY: current[1],
-                signals.HAZARD_T0: self._clock.now_ms(),
-            }
-        )

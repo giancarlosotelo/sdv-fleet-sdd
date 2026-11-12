@@ -76,3 +76,46 @@ def test_req086_book_restores_open_alerts(book):
     [resolved] = restored.hazard(hazard("none", 0, t0=2000), t1_ms=2100, trip=1)
 
     assert (resolved.id, resolved.resolved_ms) == (opened.id, 2100)
+
+
+def test_req081_stale_hazard_after_newer_clear_is_ignored(book):
+    """Pub/Sub has no ordering guarantee: an older message must not reopen an alert."""
+    assert book.hazard(hazard("none", 0, t0=1050), t1_ms=1100, trip=1) == []
+
+    assert book.hazard(hazard("harsh_braking", 3, t0=900), t1_ms=1200, trip=1) == []
+    assert book.open_hazards() == []
+
+
+def test_req081_stale_resend_does_not_resolve_newer_alert(book):
+    book.hazard(hazard("overheat", 2, t0=2000), t1_ms=2100, trip=1)
+
+    assert book.hazard(hazard("none", 0, t0=1500), t1_ms=2200, trip=1) == []
+    assert [a.t0_ms for a in book.open_hazards()] == [2000]
+
+
+def test_req081_same_hazard_with_newer_t0_reopens(book):
+    """Outbox keeps only the latest hazard, so high -> none -> high can arrive as high, high."""
+    [first] = book.hazard(hazard("harsh_braking", 2, t0=1000), t1_ms=1100, trip=1)
+
+    changed = book.hazard(hazard("harsh_braking", 2, t0=5000), t1_ms=5100, trip=1)
+
+    assert [(a.id, a.resolved_ms) for a in changed] == [(first.id, 5100), ("a2", None)]
+    assert changed[1].t0_ms == 5000
+
+
+def test_req082_ack_survives_later_resolve(book):
+    [opened] = book.hazard(hazard("overheat", 2, t0=1000), t1_ms=1100, trip=1)
+    book.ack(opened, now_ms=1500)
+
+    [resolved] = book.hazard(hazard("none", 0, t0=2000), t1_ms=2100, trip=1)
+
+    assert (resolved.acked_ms, resolved.resolved_ms) == (1500, 2100)
+
+
+def test_req081_two_changes_in_the_same_millisecond_both_apply(book):
+    book.hazard(hazard("harsh_braking", 2, t0=1000), t1_ms=1100, trip=1)
+
+    changed = book.hazard(hazard("harsh_braking", 3, t0=1000), t1_ms=1101, trip=1)
+
+    assert [a.severity for a in book.open_hazards()] == [3]
+    assert len(changed) == 2

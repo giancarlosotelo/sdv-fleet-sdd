@@ -37,3 +37,32 @@ def test_req132_test_without_adapter_needs_no_marker(pytester):
     result = _collect(pytester, test_plain="def test_math():\n    assert 1 + 1 == 2\n")
 
     assert result.ret == 0
+
+
+@pytest.mark.parametrize(
+    "imports",
+    [
+        "from fleet.vehicle import twin_kuksa",
+        "from fleet.vehicle import twin",
+        "import fleet.demo.wiring",
+    ],
+)
+def test_req132_adapter_imported_by_name_or_via_demo_needs_marker(pytester, imports):
+    test = f"def test_x():\n    {imports}\n"
+
+    result = _collect(pytester, test_planted=test)
+
+    assert result.ret != 0
+
+
+def test_req132_verbose_report_shows_the_label(pytester):
+    pytester.makeini(INI)
+    pytester.makepyfile(
+        test_planted=ADAPTER_TEST.format(marker="@pytest.mark.real").replace(
+            "from fleet.transport.zenoh import StandInZenoh", "pass  # fleet.transport.zenoh"
+        )
+        + "\n\nfrom fleet.transport import zenoh  # noqa\n"
+    )
+    result = pytester.runpytest("-v", plugins=[markers])
+
+    result.stdout.fnmatch_lines(["*test_uses_adapter PASSED [[]real[]]*"])

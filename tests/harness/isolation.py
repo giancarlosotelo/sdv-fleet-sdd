@@ -24,6 +24,7 @@ def _imports(path: Path) -> list[str]:
             found += [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             found.append(node.module)
+            found += [f"{node.module}.{alias.name}" for alias in node.names]
     return found
 
 
@@ -38,5 +39,9 @@ def check_isolation(src_root: Path) -> list[Violation]:
             forbidden = VEHICLE
         else:
             continue
-        violations += [Violation(path, m) for m in _imports(path) if _under(m, forbidden)]
+        flagged: list[str] = []
+        for m in _imports(path):  # "from a.b import c" yields a.b and a.b.c; report it once
+            if _under(m, forbidden) and not any(_under(m, (f,)) for f in flagged):
+                flagged.append(m)
+        violations += [Violation(path, m) for m in flagged]
     return violations

@@ -5,7 +5,7 @@ import pytest
 from fleet.config import load_config
 from fleet.vehicle import signals
 from fleet.vehicle.detector import Detector
-from fleet.vehicle.twin import InMemoryTwin
+from fleet.vehicle.twin import InMemoryTwin, TwinUnavailable
 from tests.harness.clock import FakeClock
 
 pytestmark = pytest.mark.standin
@@ -84,3 +84,23 @@ async def test_req050_uses_route_limit_for_overspeed(setup):
     await twin.set({signals.SPEED: 60.5})
 
     assert (await hazard(twin))[:2] == ("overspeed", 1)
+
+
+async def test_req074_failed_hazard_write_is_retried_on_next_update():
+    twin, clock = InMemoryTwin(signals.ALL), FakeClock()
+    detector = Detector(twin, 50.0, CFG.thresholds, clock)
+    await detector.start()
+    await twin.set(CALM)
+    real_set, failures = twin.set, []
+
+    async def flaky_set(values):
+        if signals.HAZARD_TYPE in values and not failures:
+            failures.append(values)
+            raise TwinUnavailable("databroker unreachable")
+        await real_set(values)
+
+    twin.set = flaky_set
+    await real_set({signals.ACCEL: -7.5})  # detector's write fails here
+    await real_set({signals.ACCEL: -7.6})  # same hazard: must be written now
+
+    assert failures and (await hazard(twin))[:2] == ("harsh_braking", 3)

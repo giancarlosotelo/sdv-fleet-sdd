@@ -62,15 +62,14 @@ async def test_req130_hard_brake_to_cloud_and_dashboard_under_2s(tmp_path, mode)
                         client_latencies.append(demo.clock.now_ms() - alert["t0_ms"])
 
             watcher = asyncio.create_task(watch())
-            started_ms = demo.clock.now_ms()
-            injected = await inject_hazards(demo, N)
+            injections = await inject_hazards(demo, N)
             await asyncio.sleep(1.0)
             watcher.cancel()
-        report = latency_report(demo, since_ms=started_ms, expected=injected)
+        report = latency_report(demo, injections)
     finally:
         await demo.stop()
 
     print(f"\n[{mode}] {report.text}\nclient p95 {nearest_rank_p95(client_latencies)} ms")
-    assert injected == N
+    assert report.injected_alerts == N
     assert report.passed, report.text
     assert nearest_rank_p95(client_latencies) < 2000

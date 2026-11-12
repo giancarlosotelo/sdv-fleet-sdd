@@ -17,8 +17,9 @@ class KuksaTwin:
 
     BASE_PORT = 55561  # van i in config order uses BASE_PORT + i (deploy/compose.yaml)
 
-    def __init__(self, client: VSSClient):
+    def __init__(self, client: VSSClient, retry_s: float = 1.0):
         self._client = client
+        self._retry_s = retry_s
         self._tasks: list[asyncio.Task] = []
 
     @classmethod
@@ -51,25 +52,34 @@ class KuksaTwin:
         return {p: (dps[p].value if dps.get(p) is not None else None) for p in paths}
 
     async def subscribe(self, paths: list[str], on_change: OnChange) -> None:
+        """Keeps the subscription alive: resubscribes after a broken stream (REQ-074)."""
         ready = asyncio.Event()
 
         async def pump() -> None:
-            first = True
-            async for updates in self._client.subscribe_current_values(paths):
-                if first:  # the databroker opens with current values, not a change
-                    first = False
-                    ready.set()
-                    continue
-                await on_change({p: dp.value for p, dp in updates.items() if dp is not None})
+            while True:
+                try:
+                    first = True
+                    async for updates in self._client.subscribe_current_values(paths):
+                        if first:  # the databroker opens with current values, not a change
+                            first = False
+                            ready.set()
+                            continue
+                        values = {p: dp.value for p, dp in updates.items() if dp is not None}
+                        try:
+                            await on_change(values)
+                        except Exception:  # one bad update must not end the stream
+                            log.exception("kuksa subscriber failed on %s", list(values))
+                except (grpc.RpcError, VSSClientError) as ex:
+                    log.warning("kuksa subscription to %s broke, resubscribing: %s", paths, ex)
+                await asyncio.sleep(self._retry_s)
 
         task = asyncio.create_task(pump())
         task.add_done_callback(self._log_failure)
         self._tasks.append(task)
-        waiter = asyncio.create_task(ready.wait())
-        done, _ = await asyncio.wait({task, waiter}, timeout=5, return_when=asyncio.FIRST_COMPLETED)
-        waiter.cancel()
-        if task in done:
-            raise self._translate(task.exception() or RuntimeError("subscription ended"))
+        try:
+            await asyncio.wait_for(ready.wait(), timeout=5)
+        except TimeoutError:
+            log.warning("kuksa subscription to %s not confirmed yet; still retrying", paths)
 
     @staticmethod
     def _log_failure(task: asyncio.Task) -> None:

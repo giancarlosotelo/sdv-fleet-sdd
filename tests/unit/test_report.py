@@ -1,21 +1,22 @@
 from types import SimpleNamespace
 
 from fleet.cloud.storage import Alert, SqliteStorage
+from fleet.demo.inject import Injection
 from fleet.demo.report import latency_report
 
 
-def _alert(i, latency_ms, opened_ms=1_000, kind="harsh_braking", severity=3):
+def _alert(i, t0, latency_ms, vid="veh-01", kind="harsh_braking", severity=3):
     return Alert(
         f"a{i}",
-        "veh-01",
+        vid,
         "hazard",
         kind,
         severity,
-        opened_ms - latency_ms,
-        opened_ms,
+        t0,
+        t0 + latency_ms,
         0.0,
         0.0,
-        opened_ms,
+        t0 + latency_ms,
         None,
         None,
         1,
@@ -29,30 +30,31 @@ def _demo(alerts):
     return SimpleNamespace(storage=storage)
 
 
-def test_req121_report_passes_when_all_injected_arrive_fast():
-    demo = _demo(
-        [_alert(i, 100 + i) for i in range(10)] + [_alert(99, 5, kind="overspeed", severity=1)]
-    )
+INJECTIONS = [Injection("veh-01", 1_000 * i) for i in range(1, 6)]
 
-    report = latency_report(demo, since_ms=0, expected=10)
 
-    assert report.passed and report.injected_alerts == 10 and report.stats.count == 11
+def test_req121_report_passes_when_every_injection_arrives_fast():
+    demo = _demo([_alert(i, inj.at_ms + 2, 100 + i) for i, inj in enumerate(INJECTIONS)])
+
+    report = latency_report(demo, INJECTIONS)
+
+    assert report.passed and report.injected_alerts == 5 and report.stats.count == 5
     assert "PASS" in report.text and "median" in report.text and "p95" in report.text
 
 
-def test_req121_report_fails_on_slow_p95_or_missing_alerts():
-    slow = latency_report(_demo([_alert(i, 2500) for i in range(5)]), since_ms=0, expected=5)
-    missing = latency_report(_demo([_alert(i, 10) for i in range(3)]), since_ms=0, expected=5)
+def test_req121_natural_harsh_brakes_do_not_count_as_injections():
+    """The simulator brakes at up to 8 m/s^2 itself; those must not top up lost injections."""
+    arrived = [_alert(i, inj.at_ms + 2, 50) for i, inj in enumerate(INJECTIONS[:3])]
+    natural = [_alert(10 + i, 50_000 + i * 700, 50) for i in range(3)]
+    other_van = [_alert(20, INJECTIONS[3].at_ms + 2, 50, vid="veh-02")]
 
-    assert not slow.passed and "FAIL" in slow.text
-    assert not missing.passed
+    report = latency_report(_demo(arrived + natural + other_van), INJECTIONS)
+
+    assert report.injected_alerts == 3
+    assert not report.passed and "FAIL" in report.text
 
 
-def test_req121_report_ignores_alerts_before_injection_started():
-    report = latency_report(
-        _demo([_alert(1, 5000, opened_ms=10), _alert(2, 10, opened_ms=2_000)]),
-        since_ms=1_000,
-        expected=1,
-    )
+def test_req121_slow_injected_alerts_fail():
+    demo = _demo([_alert(i, inj.at_ms + 2, 2500) for i, inj in enumerate(INJECTIONS)])
 
-    assert report.stats.count == 1 and report.passed
+    assert not latency_report(demo, INJECTIONS).passed

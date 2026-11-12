@@ -15,7 +15,7 @@ from fleet.vehicle.twin import Twin, TwinUnavailable
 log = logging.getLogger(__name__)
 TELEMETRY_SIGNALS = list(signals.STANDARD + (signals.TRIP, signals.SIM_TIME))
 HAZARD_SIGNALS = [signals.HAZARD_TYPE, signals.HAZARD_SEVERITY, signals.HAZARD_T0]
-HAZARD_CONTEXT = [*HAZARD_SIGNALS, signals.LAT, signals.LON, signals.SIM_TIME]
+POSITION = [signals.LAT, signals.LON, signals.SIM_TIME]
 
 
 class Publisher:
@@ -40,11 +40,11 @@ class Publisher:
         )
         self.outbox = Outbox(zenoh.put, clock, buffer_size)
         self._tasks: list[asyncio.Task] = []
+        self._hazard: dict[str, Any] = {}
 
     async def start(self) -> None:
         self._tasks.append(asyncio.create_task(self.outbox.run()))
-        # The detector writes a new T0 with every hazard change, in the same set as type and severity.
-        await self._twin.subscribe([signals.HAZARD_T0], self._on_hazard)
+        await self._twin.subscribe(HAZARD_SIGNALS, self._on_hazard)
 
     def run_in_background(self) -> None:
         self._tasks.append(asyncio.create_task(self.run_telemetry()))
@@ -63,18 +63,24 @@ class Publisher:
             "wall_ts": self._clock.now_ms(),
         }
 
-    async def _on_hazard(self, _: dict[str, Any]) -> None:
-        try:
-            v = await self._twin.get(HAZARD_CONTEXT)
-        except TwinUnavailable as ex:  # log and keep running (REQ-074)
-            log.warning("veh %s: can't read hazard: %s", self._vid, ex)
+    async def _on_hazard(self, values: dict[str, Any]) -> None:
+        # The detector sets type, severity, T0 in one write and the databroker notifies them one by
+        # one in that order; build the message from notified values, since a get() may already see
+        # the next change when a hazard lasts a single tick.
+        self._hazard.update(values)
+        if signals.HAZARD_T0 not in values:
             return
-        msg = self._envelope("hazard", v[signals.SIM_TIME] or 0.0) | {
-            "hazard_type": v[signals.HAZARD_TYPE],
-            "severity": v[signals.HAZARD_SEVERITY],
-            "t0": v[signals.HAZARD_T0],
-            "lat": v[signals.LAT] or 0.0,
-            "lon": v[signals.LON] or 0.0,
+        try:
+            pos = await self._twin.get(POSITION)
+        except TwinUnavailable as ex:  # log and keep running (REQ-074)
+            log.warning("veh %s: can't read position for hazard: %s", self._vid, ex)
+            pos = dict.fromkeys(POSITION)
+        msg = self._envelope("hazard", pos[signals.SIM_TIME] or 0.0) | {
+            "hazard_type": self._hazard[signals.HAZARD_TYPE],
+            "severity": self._hazard[signals.HAZARD_SEVERITY],
+            "t0": self._hazard[signals.HAZARD_T0],
+            "lat": pos[signals.LAT] or 0.0,
+            "lon": pos[signals.LON] or 0.0,
         }
         key = hazard_key(self._vid)
         await self.outbox.submit(key, json.dumps(msg).encode(), latest_key=key)

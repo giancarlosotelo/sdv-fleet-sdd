@@ -171,3 +171,31 @@ async def test_req115_route_table_aggregates_completed_trips(env):
     assert rows["B"]["kwh_per_100km"] == pytest.approx(25.0)
     assert rows["B"]["highest"] and not rows["A"]["highest"]
     assert (rows["C"]["trips"], rows["C"]["km"], rows["C"]["hazards_per_100km"]) == (0, None, None)
+
+
+async def test_req080_duplicate_delivery_has_one_effect(env):
+    service, storage, clock, send, events = env
+    msg = hazard("veh-02", "harsh_braking", 3, t0=clock.ms - 100)
+
+    await send(HAZARD_TOPIC, msg)
+    await send(HAZARD_TOPIC, msg)
+
+    assert len(storage.alerts()) == 1
+    assert service.latency().count == 1
+
+
+async def test_req086_restart_resolves_restored_offline_alerts(env, tmp_path):
+    service, storage, clock, send, events = env
+    clock.ms += 10_500
+    await service.check_offline()
+    assert len([a for a in storage.alerts() if a.kind == "offline"]) == 3
+    storage.close()
+
+    pubsub = StandInPubSub()
+    restarted = CloudService(CFG, SqliteStorage(tmp_path / "fleet.db"), clock)
+    await restarted.start(pubsub)
+    for vid in ("veh-01", "veh-02", "veh-03"):
+        await pubsub.publish(TELEMETRY_TOPIC, json.dumps(telemetry(vid, 1, 0.0, 60.0)).encode())
+
+    assert [a for a in restarted.alerts() if a["kind"] == "offline"] == []
+    assert restarted.snapshot()["vehicles"]["veh-01"]["online"] is True

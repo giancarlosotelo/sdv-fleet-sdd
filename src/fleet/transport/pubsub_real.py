@@ -10,6 +10,8 @@ from fleet.transport.pubsub import MessageHandler
 
 PROJECT = "fleet-local"
 DEFAULT_EMULATOR = "127.0.0.1:8085"
+# The client retries for up to 600 s; fail fast so the outbox buffers and backs off (REQ-074).
+PUBLISH_TIMEOUT_S = 5.0
 
 
 class RealPubSub:
@@ -26,26 +28,30 @@ class RealPubSub:
         self._pulls: list = []
         self._tasks: list[asyncio.Task] = []
 
-    def _topic(self, topic: str) -> str:
+    async def _topic(self, topic: str) -> str:
         path = self._publisher.topic_path(self._project, topic)
         if path not in self._topics:
             try:
-                self._publisher.create_topic(name=path, timeout=5)
+                # retry=None: the default retry policy ignores `timeout` and blocks for minutes.
+                await asyncio.to_thread(
+                    self._publisher.create_topic, name=path, timeout=PUBLISH_TIMEOUT_S, retry=None
+                )
             except exceptions.AlreadyExists:
                 pass
-            except exceptions.GoogleAPICallError as ex:
+            except exceptions.GoogleAPIError as ex:
                 raise TransportUnavailable(f"pubsub: {ex}") from ex
             self._topics.add(path)
         return path
 
     async def publish(self, topic: str, data: bytes) -> None:
         try:
-            await asyncio.wrap_future(self._publisher.publish(self._topic(topic), data))
-        except exceptions.GoogleAPICallError as ex:
-            raise TransportUnavailable(f"pubsub publish: {ex}") from ex
+            future = self._publisher.publish(await self._topic(topic), data)
+            await asyncio.wait_for(asyncio.wrap_future(future), PUBLISH_TIMEOUT_S)
+        except (exceptions.GoogleAPIError, TimeoutError) as ex:
+            raise TransportUnavailable(f"pubsub publish: {ex!r}") from ex
 
     async def subscribe(self, topic: str, handler: MessageHandler) -> None:
-        topic_path = self._topic(topic)
+        topic_path = await self._topic(topic)
         sub_path = self._subscriber.subscription_path(
             self._project, f"{topic}-{uuid.uuid4().hex[:8]}"
         )

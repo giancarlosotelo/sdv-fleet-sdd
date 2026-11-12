@@ -50,10 +50,9 @@ async def run(args: argparse.Namespace) -> int:
         return 0
     try:
         await asyncio.sleep(WARM_UP_S)
-        since = demo.clock.now_ms()
-        injected = await inject_hazards(demo, args.inject_hazards)
+        injections = await inject_hazards(demo, args.inject_hazards)
         await asyncio.sleep(1.0)
-        report = latency_report(demo, since_ms=since, expected=injected)
+        report = latency_report(demo, injections)
         print(report.text, flush=True)
         return 0 if report.passed else 1
     finally:
